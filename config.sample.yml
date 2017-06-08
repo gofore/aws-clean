@@ -1,6 +1,6 @@
 ---
 
-# credentials profile name from your ~/.aws/credentials file
+# Credentials profile name from your ~/.aws/credentials file
 profile_name: your-profile-name
 
 # Assertions must pass before any resources are destroyed
@@ -9,6 +9,7 @@ assertions:
   account_alias: your-account-iam-alias
   iam_username: your-iam-username
 
+# Resources that should not be deleted
 preserved_resources:
   cloudformation:
     - name-of-stack-to-save
@@ -16,3 +17,5 @@ preserved_resources:
     - name-of-key-to-save
   ami:
     - ami-01234567
+  snapshots:
+    - snap-01234567

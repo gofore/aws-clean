@@ -81,7 +81,7 @@ class Cleaner:
         keys_to_delete = [key.get("KeyName") 
             for key in keys.get("KeyPairs")
             if key.get("KeyName") 
-            not in self.config.get("preserved_resources").get("ec2_key_pairs")]
+            not in self.config.get("preserved_resources", {}).get("ec2_key_pairs", [])]
         print("Keys that will be deleted:", keys_to_delete)
         if self._ask("Delete?", "no"):
             for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
@@ -93,10 +93,22 @@ class Cleaner:
         images_to_delete = [image.get("ImageId") 
             for image in images.get("Images")
             if image.get("ImageId") 
-            not in self.config.get("preserved_resources").get("ami")]
+            not in self.config.get("preserved_resources", {}).get("ami", [])]
         print("AMIs that will be deleted:", images_to_delete)
         if self._ask("Delete?", "no"):
             for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
+
+    def delete_snapshots(self):
+        snapshots = self.ec2.describe_snapshots(
+            OwnerIds=[self.sts.get_caller_identity().get("Account")]
+        )
+        snapshots_to_delete = [snapshot.get("SnapshotId") 
+            for snapshot in snapshots.get("Snapshots")
+            if snapshot.get("SnapshotId") 
+            not in self.config.get("preserved_resources", {}).get("snapshots", [])]
+        print("Snapshots that will be deleted:", snapshots_to_delete)
+        if self._ask("Delete?", "no"):
+            for snapshot in snapshots_to_delete: self.ec2.delete_snapshot(SnapshotId=snapshot)
 
 
 def _get_config_from_file(filename):
@@ -113,3 +125,4 @@ if __name__ == "__main__":
     cleaner.delete_cloudformation_stacks()
     cleaner.delete_key_pairs()
     cleaner.delete_amis()
+    cleaner.delete_snapshots()

@@ -6,6 +6,8 @@ This utility tool will delete all resources from your AWS account. Whitelisted r
 
 - Cloudformation stacks
 - EC2 key pairs
+- EC2 AMI images
+- EBS snapshots
 
 ### Usage
 
@@ -16,3 +18,7 @@ Create a config from the sample file and edit it:
 Run cleaner:
 
     ./clean.py config.yml
+
+### Disclaimer
+
+This tool is provided as-is, use at your own risk!
