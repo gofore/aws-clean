@@ -19,3 +19,5 @@ preserved_resources:
     - ami-01234567
   snapshots:
     - snap-01234567
+  cloudwatch_alarms:
+    - name-of-alarm-to-save

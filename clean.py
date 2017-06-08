@@ -11,6 +11,7 @@ class Cleaner:
         self.config = config
         self.boto_session = boto3.Session(profile_name=self.config.get("profile_name"))
         self.cf = self.boto_session.client("cloudformation")
+        self.cloudwatch = self.boto_session.client("cloudwatch")
         self.ec2 = self.boto_session.client("ec2")
         self.iam = self.boto_session.client("iam")
         self.sts = self.boto_session.client("sts")
@@ -110,6 +111,16 @@ class Cleaner:
         if self._ask("Delete?", "no"):
             for snapshot in snapshots_to_delete: self.ec2.delete_snapshot(SnapshotId=snapshot)
 
+    def delete_cloudwatch_alarms(self):
+        alarms = self.cloudwatch.describe_alarms()
+        alarms_to_delete = [alarm.get("AlarmName") 
+            for alarm in alarms.get("MetricAlarms")
+            if alarm.get("AlarmName") 
+            not in self.config.get("preserved_resources", {}).get("cloudwatch_alarms", [])]
+        print("Alarms that will be deleted:", alarms_to_delete)
+        if self._ask("Delete?", "no"):
+            self.cloudwatch.delete_alarms(AlarmNames=alarms_to_delete)
+
 
 def _get_config_from_file(filename):
     config = {}
@@ -126,3 +137,4 @@ if __name__ == "__main__":
     cleaner.delete_key_pairs()
     cleaner.delete_amis()
     cleaner.delete_snapshots()
+    cleaner.delete_cloudwatch_alarms()
