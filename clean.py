@@ -11,6 +11,26 @@ class Cleaner:
         self.config = config
         self.boto_session = boto3.Session(profile_name=self.config.get("profile_name"))
 
+    def _ask(self, question, default="no"):
+        valid = {"yes": True, "y": True, "no": False, "n": False}
+        if default is None:
+            prompt = " [y/n] "
+        elif default == "yes":
+            prompt = " [Y/n] "
+        elif default == "no":
+            prompt = " [y/N] "
+        else:
+            raise ValueError("Invalid default answer: '%s'" % default)
+        while True:
+            sys.stdout.write(question + prompt)
+            choice = raw_input().lower()
+            if default is not None and choice == "":
+                return valid[default]
+            elif choice in valid:
+                return valid[choice]
+            else:
+                sys.stdout.write("Please answer 'yes' or 'no' (or 'y' or 'n').\n")
+
     def show_config(self):
         print(yaml.dump(self.config))
 
@@ -25,6 +45,7 @@ class Cleaner:
         assert current_user == self.config.get("assertions").get("iam_username"), "Unexpected IAM User name, check configuration!"
 
         print("You are {} on account {}".format(current_user, account_id))
+        if not self._ask("Proceed?", "no"): sys.exit()
 
     def delete_cloudformation_stacks(self):
         cf = self.boto_session.client("cloudformation")
@@ -42,7 +63,8 @@ class Cleaner:
             for stack in stacks.get("StackSummaries") 
             if stack.get("StackName") 
             not in self.config.get("preserved_resources").get("cloudformation")]
-        print("Deleting stacks", stacks_to_delete)
+        print("Stacks that will be deleted:", stacks_to_delete)
+        if not self._ask("Delete?", "no"): sys.exit()
         for stack in stacks_to_delete: cf.delete_stack(StackName=stack)
 
     def delete_key_pairs(self):
@@ -52,8 +74,10 @@ class Cleaner:
             for key in keys.get("KeyPairs")
             if key.get("KeyName") 
             not in self.config.get("preserved_resources").get("ec2_key_pairs")]
-        print("Deleting keys", keys_to_delete)
+        print("Keys that will be deleted:", keys_to_delete)
+        if not self._ask("Delete?", "no"): sys.exit()
         for key in keys_to_delete: ec2.delete_key_pair(KeyName=key)
+
 
 def _get_config_from_file(filename):
     config = {}
