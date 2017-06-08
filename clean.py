@@ -45,6 +45,15 @@ class Cleaner:
         print("Deleting stacks", stacks_to_delete)
         for stack in stacks_to_delete: cf.delete_stack(StackName=stack)
 
+    def delete_key_pairs(self):
+        ec2 = self.boto_session.client("ec2")
+        keys = ec2.describe_key_pairs()
+        keys_to_delete = [key.get("KeyName") 
+            for key in keys.get("KeyPairs")
+            if key.get("KeyName") 
+            not in self.config.get("preserved_resources").get("ec2_key_pairs")]
+        print("Deleting keys", keys_to_delete)
+        for key in keys_to_delete: ec2.delete_key_pair(KeyName=key)
 
 def _get_config_from_file(filename):
     config = {}
@@ -58,3 +67,4 @@ if __name__ == "__main__":
     cleaner.show_config()
     cleaner.run_safety_checks()
     cleaner.delete_cloudformation_stacks()
+    cleaner.delete_key_pairs()
