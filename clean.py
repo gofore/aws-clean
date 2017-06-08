@@ -86,6 +86,18 @@ class Cleaner:
         if not self._ask("Delete?", "no"): sys.exit()
         for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
 
+    def delete_amis(self):
+        images = self.ec2.describe_images(
+            Owners=[self.sts.get_caller_identity().get("Account")]
+        )
+        images_to_delete = [image.get("ImageId") 
+            for image in images.get("Images")
+            if image.get("ImageId") 
+            not in self.config.get("preserved_resources").get("ami")]
+        print("AMIs that will be deleted:", images_to_delete)
+        if not self._ask("Delete?", "no"): sys.exit()
+        for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
+
 
 def _get_config_from_file(filename):
     config = {}
@@ -100,3 +112,4 @@ if __name__ == "__main__":
     cleaner.run_safety_checks()
     cleaner.delete_cloudformation_stacks()
     cleaner.delete_key_pairs()
+    cleaner.delete_amis()

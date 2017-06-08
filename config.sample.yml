@@ -6,6 +6,7 @@ profile_name: your-profile-name
 # Assertions must pass before any resources are destroyed
 assertions:
   account_id: "012345678901"
+  account_alias: your-account-iam-alias
   iam_username: your-iam-username
 
 preserved_resources:
@@ -13,3 +14,5 @@ preserved_resources:
     - name-of-stack-to-save
   ec2_key_pairs:
     - name-of-key-to-save
+  ami:
+    - ami-01234567
