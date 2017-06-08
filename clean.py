@@ -10,6 +10,10 @@ class Cleaner:
     def __init__(self, config):
         self.config = config
         self.boto_session = boto3.Session(profile_name=self.config.get("profile_name"))
+        self.cf = self.boto_session.client("cloudformation")
+        self.ec2 = self.boto_session.client("ec2")
+        self.iam = self.boto_session.client("iam")
+        self.sts = self.boto_session.client("sts")
 
     def _ask(self, question, default="no"):
         valid = {"yes": True, "y": True, "no": False, "n": False}
@@ -36,20 +40,25 @@ class Cleaner:
 
     def run_safety_checks(self):
         # AWS Account ID in config.yml must match the account we are accessing using an API key
-        account_id = self.boto_session.client("sts").get_caller_identity().get("Account")
+        account_id = self.sts.get_caller_identity().get("Account")
         assert account_id == self.config.get("assertions").get("account_id"), "Unexpected AWS Account ID, check configuration!"
 
+        # AWS Account alias in config.yml must match the account alias
+        account_aliases = self.iam.list_account_aliases().get("AccountAliases")
+        assert len(account_aliases) == 1, "AWS Account should have exactly one alias"
+        account_alias = account_aliases[0]
+        assert account_alias == self.config.get("assertions").get("account_alias"), "Unexpected AWS Account alias, check configuration!"
+
         # IAM username in config.yml must match the IAM user whose API key we are using
-        iam = self.boto_session.resource("iam")
-        current_user = iam.CurrentUser().user_name
+        iam_resource = self.boto_session.resource("iam")
+        current_user = iam_resource.CurrentUser().user_name
         assert current_user == self.config.get("assertions").get("iam_username"), "Unexpected IAM User name, check configuration!"
 
-        print("You are {} on account {}".format(current_user, account_id))
+        print("You are {} on account {} ({})".format(current_user, account_id, account_alias))
         if not self._ask("Proceed?", "no"): sys.exit()
 
     def delete_cloudformation_stacks(self):
-        cf = self.boto_session.client("cloudformation")
-        stacks = cf.list_stacks(StackStatusFilter=[
+        stacks = self.cf.list_stacks(StackStatusFilter=[
             "CREATE_FAILED",
             "CREATE_COMPLETE",
             "ROLLBACK_FAILED",
@@ -65,18 +74,17 @@ class Cleaner:
             not in self.config.get("preserved_resources").get("cloudformation")]
         print("Stacks that will be deleted:", stacks_to_delete)
         if not self._ask("Delete?", "no"): sys.exit()
-        for stack in stacks_to_delete: cf.delete_stack(StackName=stack)
+        for stack in stacks_to_delete: self.cf.delete_stack(StackName=stack)
 
     def delete_key_pairs(self):
-        ec2 = self.boto_session.client("ec2")
-        keys = ec2.describe_key_pairs()
+        keys = self.ec2.describe_key_pairs()
         keys_to_delete = [key.get("KeyName") 
             for key in keys.get("KeyPairs")
             if key.get("KeyName") 
             not in self.config.get("preserved_resources").get("ec2_key_pairs")]
         print("Keys that will be deleted:", keys_to_delete)
         if not self._ask("Delete?", "no"): sys.exit()
-        for key in keys_to_delete: ec2.delete_key_pair(KeyName=key)
+        for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
 
 
 def _get_config_from_file(filename):
