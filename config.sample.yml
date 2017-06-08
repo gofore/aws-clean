@@ -1,0 +1,13 @@
+---
+
+# credentials profile name from your ~/.aws/credentials file
+profile_name: your-profile-name
+
+# Assertions must pass before any resources are destroyed
+assertions:
+  account_id: "012345678901"
+  iam_username: your-iam-username
+
+preserved_resources:
+  cloudformation:
+    - name-of-stack-to-save
