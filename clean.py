@@ -73,8 +73,8 @@ class Cleaner:
             if stack.get("StackName") 
             not in self.config.get("preserved_resources").get("cloudformation")]
         print("Stacks that will be deleted:", stacks_to_delete)
-        if not self._ask("Delete?", "no"): sys.exit()
-        for stack in stacks_to_delete: self.cf.delete_stack(StackName=stack)
+        if self._ask("Delete?", "no"):
+            for stack in stacks_to_delete: self.cf.delete_stack(StackName=stack)
 
     def delete_key_pairs(self):
         keys = self.ec2.describe_key_pairs()
@@ -83,8 +83,8 @@ class Cleaner:
             if key.get("KeyName") 
             not in self.config.get("preserved_resources").get("ec2_key_pairs")]
         print("Keys that will be deleted:", keys_to_delete)
-        if not self._ask("Delete?", "no"): sys.exit()
-        for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
+        if self._ask("Delete?", "no"):
+            for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
 
     def delete_amis(self):
         images = self.ec2.describe_images(
@@ -95,8 +95,8 @@ class Cleaner:
             if image.get("ImageId") 
             not in self.config.get("preserved_resources").get("ami")]
         print("AMIs that will be deleted:", images_to_delete)
-        if not self._ask("Delete?", "no"): sys.exit()
-        for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
+        if self._ask("Delete?", "no"):
+            for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
 
 
 def _get_config_from_file(filename):
