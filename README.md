@@ -5,6 +5,7 @@ This utility tool will delete all resources from your AWS account. Whitelisted r
 ### Currently supported resources:
 
 - Cloudformation stacks
+- EC2 key pairs
 
 ### Usage
 

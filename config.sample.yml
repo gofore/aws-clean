@@ -11,3 +11,5 @@ assertions:
 preserved_resources:
   cloudformation:
     - name-of-stack-to-save
+  ec2_key_pairs:
+    - name-of-key-to-save
