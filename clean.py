@@ -39,7 +39,7 @@ class Cleaner:
                 sys.stdout.write("Please answer 'yes' or 'no' (or 'y' or 'n').\n")
 
     def show_config(self):
-        print(yaml.dump(self.config))
+        print("Current configuration:\n", yaml.dump(self.config, default_flow_style=False))
 
     def run_safety_checks(self):
         # AWS Account ID in config.yml must match the account we are accessing using an API key
@@ -75,9 +75,12 @@ class Cleaner:
             for stack in stacks.get("StackSummaries") 
             if stack.get("StackName") 
             not in self.config.get("preserved_resources").get("cloudformation")]
-        print("Stacks that will be deleted:", stacks_to_delete)
-        if self._ask("Delete?", "no"):
-            for stack in stacks_to_delete: self.cf.delete_stack(StackName=stack)
+        if stacks_to_delete:
+            print("Stacks that will be deleted:", stacks_to_delete)
+            if self._ask("Delete stacks?", "no"):
+                for stack in stacks_to_delete: self.cf.delete_stack(StackName=stack)
+        else:
+            print("No stacks to delete")
 
     def delete_key_pairs(self):
         keys = self.ec2.describe_key_pairs()
@@ -85,9 +88,12 @@ class Cleaner:
             for key in keys.get("KeyPairs")
             if key.get("KeyName") 
             not in self.config.get("preserved_resources", {}).get("ec2_key_pairs", [])]
-        print("Keys that will be deleted:", keys_to_delete)
-        if self._ask("Delete?", "no"):
-            for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
+        if keys_to_delete:
+            print("Keys that will be deleted:", keys_to_delete)
+            if self._ask("Delete keys?", "no"):
+                for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
+        else:
+            print("No keys to delete")
 
     def delete_amis(self):
         images = self.ec2.describe_images(
@@ -97,9 +103,12 @@ class Cleaner:
             for image in images.get("Images")
             if image.get("ImageId") 
             not in self.config.get("preserved_resources", {}).get("ami", [])]
-        print("AMIs that will be deleted:", images_to_delete)
-        if self._ask("Delete?", "no"):
-            for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
+        if images_to_delete:
+            print("AMIs that will be deleted:", images_to_delete)
+            if self._ask("Delete images?", "no"):
+                for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
+        else:
+            print("No images to delete")
 
     def delete_snapshots(self):
         snapshots = self.ec2.describe_snapshots(
@@ -109,9 +118,12 @@ class Cleaner:
             for snapshot in snapshots.get("Snapshots")
             if snapshot.get("SnapshotId") 
             not in self.config.get("preserved_resources", {}).get("snapshots", [])]
-        print("Snapshots that will be deleted:", snapshots_to_delete)
-        if self._ask("Delete?", "no"):
-            for snapshot in snapshots_to_delete: self.ec2.delete_snapshot(SnapshotId=snapshot)
+        if snapshots_to_delete:
+            print("Snapshots that will be deleted:", snapshots_to_delete)
+            if self._ask("Delete snapshots?", "no"):
+                for snapshot in snapshots_to_delete: self.ec2.delete_snapshot(SnapshotId=snapshot)
+        else:
+            print("No snapshots to delete")
 
     def delete_cloudwatch_alarms(self):
         alarms = self.cloudwatch.describe_alarms()
@@ -119,9 +131,12 @@ class Cleaner:
             for alarm in alarms.get("MetricAlarms")
             if alarm.get("AlarmName") 
             not in self.config.get("preserved_resources", {}).get("cloudwatch_alarms", [])]
-        print("Alarms that will be deleted:", alarms_to_delete)
-        if self._ask("Delete?", "no"):
-            self.cloudwatch.delete_alarms(AlarmNames=alarms_to_delete)
+        if alarms_to_delete:
+            print("Alarms that will be deleted:", alarms_to_delete)
+            if self._ask("Delete alarms?", "no"):
+                self.cloudwatch.delete_alarms(AlarmNames=alarms_to_delete)
+        else:
+            print("No alarms to delete")
 
     def delete_buckets(self):
         buckets = self.s3.list_buckets()
@@ -129,12 +144,15 @@ class Cleaner:
             for bucket in buckets.get("Buckets")
             if bucket.get("Name") 
             not in self.config.get("preserved_resources", {}).get("s3_buckets", [])]
-        print("Buckets that will be deleted:", buckets_to_delete)
-        if self._ask("Delete?", "no"):
-            for bucket_name in buckets_to_delete:
-                bucket = self.s3_resource.Bucket(bucket_name)
-                bucket.object_versions.delete()
-                bucket.delete()
+        if buckets_to_delete:
+            print("Buckets that will be deleted:", buckets_to_delete)
+            if self._ask("Delete buckets?", "no"):
+                for bucket_name in buckets_to_delete:
+                    bucket = self.s3_resource.Bucket(bucket_name)
+                    bucket.object_versions.delete()
+                    bucket.delete()
+        else:
+            print("No buckets to delete")
 
 
 def _get_config_from_file(filename):

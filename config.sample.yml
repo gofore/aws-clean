@@ -3,7 +3,7 @@
 # Credentials profile name from your ~/.aws/credentials file
 profile_name: your-profile-name
 
-# Assertions must pass before any resources are destroyed
+# Assertions must pass before any resources are deleted
 assertions:
   account_id: "012345678901"
   account_alias: your-account-iam-alias
