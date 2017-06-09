@@ -21,3 +21,5 @@ preserved_resources:
     - snap-01234567
   cloudwatch_alarms:
     - name-of-alarm-to-save
+  s3_buckets:
+    - name-of-bucket-to-save

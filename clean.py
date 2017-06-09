@@ -14,6 +14,8 @@ class Cleaner:
         self.cloudwatch = self.boto_session.client("cloudwatch")
         self.ec2 = self.boto_session.client("ec2")
         self.iam = self.boto_session.client("iam")
+        self.s3 = self.boto_session.client("s3")
+        self.s3_resource = self.boto_session.resource("s3")
         self.sts = self.boto_session.client("sts")
 
     def _ask(self, question, default="no"):
@@ -121,6 +123,19 @@ class Cleaner:
         if self._ask("Delete?", "no"):
             self.cloudwatch.delete_alarms(AlarmNames=alarms_to_delete)
 
+    def delete_buckets(self):
+        buckets = self.s3.list_buckets()
+        buckets_to_delete = [bucket.get("Name") 
+            for bucket in buckets.get("Buckets")
+            if bucket.get("Name") 
+            not in self.config.get("preserved_resources", {}).get("s3_buckets", [])]
+        print("Buckets that will be deleted:", buckets_to_delete)
+        if self._ask("Delete?", "no"):
+            for bucket_name in buckets_to_delete:
+                bucket = self.s3_resource.Bucket(bucket_name)
+                bucket.object_versions.delete()
+                bucket.delete()
+
 
 def _get_config_from_file(filename):
     config = {}
@@ -138,3 +153,4 @@ if __name__ == "__main__":
     cleaner.delete_amis()
     cleaner.delete_snapshots()
     cleaner.delete_cloudwatch_alarms()
+    cleaner.delete_buckets()

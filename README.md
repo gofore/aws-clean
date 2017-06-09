@@ -9,6 +9,7 @@ This utility tool will delete all resources from your AWS account. Whitelisted r
 - EC2 AMI images
 - EBS snapshots
 - CloudWatch alarms
+- S3 buckets
 
 ### Usage
 
