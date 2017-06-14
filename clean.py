@@ -48,7 +48,7 @@ class Cleaner:
 
     def _delete_generic_resource(self, resources, human_name, delete_function, delete_key):
         if resources:
-            print("{} that will be deleted:".format(human_name), resources)
+            print("{} that will be deleted:\n".format(human_name), yaml.safe_dump(resources, default_flow_style=False))
             if self._ask("Delete {}?".format(human_name), "no"):
                 for key, resource in resources.iteritems():
                     print("Deleting", key)
@@ -106,17 +106,7 @@ class Cleaner:
             print("No stacks to delete")
 
     def delete_key_pairs(self):
-        keys = self.ec2.describe_key_pairs()
-        keys_to_delete = [key.get("KeyName") 
-            for key in keys.get("KeyPairs")
-            if key.get("KeyName") 
-            not in self.config.get("preserved_resources", {}).get("ec2_key_pairs", [])]
-        if keys_to_delete:
-            print("Keys that will be deleted:", keys_to_delete)
-            if self._ask("Delete keys?", "no"):
-                for key in keys_to_delete: self.ec2.delete_key_pair(KeyName=key)
-        else:
-            print("No keys to delete")
+        self._simple_delete(self.ec2.describe_key_pairs, self.ec2.delete_key_pair, "ec2_key_pairs", "Keys", "KeyPairs", "KeyName")
 
     def delete_amis(self):
         images = self.ec2.describe_images(
