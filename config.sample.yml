@@ -23,3 +23,5 @@ preserved_resources:
     - name-of-alarm-to-save
   s3_buckets:
     - name-of-bucket-to-save
+  securitygroups:
+    - sg-01234567
