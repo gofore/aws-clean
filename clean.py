@@ -38,6 +38,29 @@ class Cleaner:
             else:
                 sys.stdout.write("Please answer 'yes' or 'no' (or 'y' or 'n').\n")
 
+    def _get_deletable_resources(self, describe_function, preserve_key, list_key, item_key):
+        resource_list = describe_function().get(list_key, [])
+        resources = {}
+        for resource in resource_list:
+            if resource[item_key] not in self.config.get("preserved_resources", {}).get(preserve_key, []):
+                resources[resource[item_key]] = resource
+        return resources
+
+    def _delete_generic_resource(self, resources, human_name, delete_function, delete_key):
+        if resources:
+            print("{} that will be deleted:".format(human_name), resources)
+            if self._ask("Delete {}?".format(human_name), "no"):
+                for key, resource in resources.iteritems():
+                    print("Deleting", key)
+                    kwargs = {delete_key: key}
+                    delete_function(**kwargs)
+        else:
+            print("No {} to delete".format(human_name))
+
+    def _simple_delete(self, describe_function, delete_function, preserve_key, human_name, list_key, item_key):
+        deletables = self._get_deletable_resources(describe_function, preserve_key, list_key, item_key)
+        self._delete_generic_resource(deletables, human_name, delete_function, item_key)
+
     def show_config(self):
         print("Current configuration:\n", yaml.dump(self.config, default_flow_style=False))
 
