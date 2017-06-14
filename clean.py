@@ -102,34 +102,16 @@ class Cleaner:
         self._simple_delete(self.ec2.describe_key_pairs, self.ec2.delete_key_pair, "ec2_key_pairs", "KeyPairs", "KeyName")
 
     def delete_amis(self):
-        images = self.ec2.describe_images(
-            Owners=[self.sts.get_caller_identity().get("Account")]
-        )
-        images_to_delete = [image.get("ImageId") 
-            for image in images.get("Images")
-            if image.get("ImageId") 
-            not in self.config.get("preserved_resources", {}).get("ami", [])]
-        if images_to_delete:
-            print("AMIs that will be deleted:", images_to_delete)
-            if self._ask("Delete images?", "no"):
-                for image in images_to_delete: self.ec2.deregister_image(ImageId=image)
-        else:
-            print("No images to delete")
+        args = {
+            "Owners": [self.sts.get_caller_identity().get("Account")]
+        }
+        self._simple_delete(self.ec2.describe_images, self.ec2.deregister_image, "ami", "Images", "ImageId", args)
 
     def delete_snapshots(self):
-        snapshots = self.ec2.describe_snapshots(
-            OwnerIds=[self.sts.get_caller_identity().get("Account")]
-        )
-        snapshots_to_delete = [snapshot.get("SnapshotId") 
-            for snapshot in snapshots.get("Snapshots")
-            if snapshot.get("SnapshotId") 
-            not in self.config.get("preserved_resources", {}).get("snapshots", [])]
-        if snapshots_to_delete:
-            print("Snapshots that will be deleted:", snapshots_to_delete)
-            if self._ask("Delete snapshots?", "no"):
-                for snapshot in snapshots_to_delete: self.ec2.delete_snapshot(SnapshotId=snapshot)
-        else:
-            print("No snapshots to delete")
+        args = {
+            "OwnerIds": [self.sts.get_caller_identity().get("Account")]
+        }
+        self._simple_delete(self.ec2.describe_snapshots, self.ec2.delete_snapshot, "snapshots", "Snapshots", "SnapshotId", args)
 
     def delete_cloudwatch_alarms(self):
         alarms = self.cloudwatch.describe_alarms()
