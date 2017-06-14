@@ -154,6 +154,21 @@ class Cleaner:
         else:
             print("No buckets to delete")
 
+    def delete_securitygroups(self):
+        securitygroups = self.ec2.describe_security_groups()
+        securitygroups_to_delete = [group.get("GroupId") 
+            for group in securitygroups.get("SecurityGroups")
+            if group.get("GroupId") 
+            not in self.config.get("preserved_resources", {}).get("securitygroups", [])
+            and group.get("GroupName") != "default"
+            ]
+        if securitygroups_to_delete:
+            print("Security groups that will be deleted:", securitygroups_to_delete)
+            if self._ask("Delete security groups?", "no"):
+                for group in securitygroups_to_delete: self.ec2.delete_security_group(GroupId=group)
+        else:
+            print("No alarms to delete")
+
 
 def _get_config_from_file(filename):
     config = {}
@@ -167,8 +182,9 @@ if __name__ == "__main__":
     cleaner.show_config()
     cleaner.run_safety_checks()
     cleaner.delete_cloudformation_stacks()
-    cleaner.delete_key_pairs()
+    cleaner.delete_cloudwatch_alarms()
     cleaner.delete_amis()
     cleaner.delete_snapshots()
-    cleaner.delete_cloudwatch_alarms()
+    cleaner.delete_securitygroups()
+    cleaner.delete_key_pairs()
     cleaner.delete_buckets()
