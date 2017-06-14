@@ -38,12 +38,15 @@ class Cleaner:
             else:
                 sys.stdout.write("Please answer 'yes' or 'no' (or 'y' or 'n').\n")
 
-    def _get_deletable_resources(self, describe_function, describe_args, preserve_key, list_key, item_key):
+    def _get_deletable_resources(self, describe_function, describe_args, preserve_key, list_key, item_key, filter_function=None):
         resources = describe_function(**describe_args).get(list_key, [])
         preserved_resources = self.config.get("preserved_resources", {}).get(preserve_key, [])
-        def can_be_deleted(key, preserved_resources):
-            return key not in preserved_resources
-        return {resource[item_key]: resource for resource in resources if can_be_deleted(resource[item_key], preserved_resources)}
+        def can_be_deleted(key, preserved_resources, resource):
+            if filter_function:
+                return filter_function(resource) and key not in preserved_resources
+            else:
+                return key not in preserved_resources
+        return {resource[item_key]: resource for resource in resources if can_be_deleted(resource[item_key], preserved_resources, resource)}
 
     def _delete_generic_resource(self, resources, human_name, delete_function, delete_key):
         if resources:
@@ -56,8 +59,8 @@ class Cleaner:
         else:
             print("No {} to delete".format(human_name))
 
-    def _simple_delete(self, describe_function, delete_function, preserve_key, list_key, item_key, describe_args={}):
-        deletables = self._get_deletable_resources(describe_function, describe_args, preserve_key, list_key, item_key)
+    def _simple_delete(self, describe_function, delete_function, preserve_key, list_key, item_key, describe_args={}, filter_function=None):
+        deletables = self._get_deletable_resources(describe_function, describe_args, preserve_key, list_key, item_key, filter_function)
         self._delete_generic_resource(deletables, list_key, delete_function, item_key)
 
     def show_config(self):
@@ -134,19 +137,16 @@ class Cleaner:
         self._simple_delete(self.s3.list_buckets, self.delete_bucket_and_its_objects, "s3_buckets", "Buckets", "Name")
 
     def delete_securitygroups(self):
-        securitygroups = self.ec2.describe_security_groups()
-        securitygroups_to_delete = [group.get("GroupId") 
-            for group in securitygroups.get("SecurityGroups")
-            if group.get("GroupId") 
-            not in self.config.get("preserved_resources", {}).get("securitygroups", [])
-            and group.get("GroupName") != "default"
-            ]
-        if securitygroups_to_delete:
-            print("Security groups that will be deleted:", securitygroups_to_delete)
-            if self._ask("Delete security groups?", "no"):
-                for group in securitygroups_to_delete: self.ec2.delete_security_group(GroupId=group)
-        else:
-            print("No alarms to delete")
+        def not_default(resource):
+            return resource["GroupName"] != "default"
+        self._simple_delete(
+            self.ec2.describe_security_groups, 
+            self.ec2.delete_security_group, 
+            "securitygroups", 
+            "SecurityGroups", 
+            "GroupId", 
+            filter_function=not_default
+        )
 
 
 def _get_config_from_file(filename):
