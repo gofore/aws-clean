@@ -7,8 +7,8 @@ import yaml
 class Cleaner:
 
     def __init__(self, config):
-        import boto3
         self.config = config
+        import boto3
         self.boto_session = boto3.Session(profile_name=self.config.get("profile_name"))
         self.cf = self.boto_session.client("cloudformation")
         self.cloudwatch = self.boto_session.client("cloudwatch")
@@ -38,8 +38,8 @@ class Cleaner:
             else:
                 sys.stdout.write("Please answer 'yes' or 'no' (or 'y' or 'n').\n")
 
-    def _get_deletable_resources(self, describe_function, preserve_key, list_key, item_key):
-        resource_list = describe_function().get(list_key, [])
+    def _get_deletable_resources(self, describe_function, describe_args, preserve_key, list_key, item_key):
+        resource_list = describe_function(**describe_args).get(list_key, [])
         resources = {}
         for resource in resource_list:
             if resource[item_key] not in self.config.get("preserved_resources", {}).get(preserve_key, []):
@@ -48,7 +48,7 @@ class Cleaner:
 
     def _delete_generic_resource(self, resources, human_name, delete_function, delete_key):
         if resources:
-            print("{} that will be deleted:\n".format(human_name), yaml.safe_dump(resources, default_flow_style=False))
+            print("{} that will be deleted:\n".format(human_name) + yaml.safe_dump(resources, default_flow_style=False))
             if self._ask("Delete {}?".format(human_name), "no"):
                 for key, resource in resources.iteritems():
                     print("Deleting", key)
@@ -57,8 +57,8 @@ class Cleaner:
         else:
             print("No {} to delete".format(human_name))
 
-    def _simple_delete(self, describe_function, delete_function, preserve_key, list_key, item_key):
-        deletables = self._get_deletable_resources(describe_function, preserve_key, list_key, item_key)
+    def _simple_delete(self, describe_function, delete_function, preserve_key, list_key, item_key, describe_args={}):
+        deletables = self._get_deletable_resources(describe_function, describe_args, preserve_key, list_key, item_key)
         self._delete_generic_resource(deletables, list_key, delete_function, item_key)
 
     def show_config(self):
@@ -84,26 +84,19 @@ class Cleaner:
         if not self._ask("Proceed?", "no"): sys.exit()
 
     def delete_cloudformation_stacks(self):
-        stacks = self.cf.list_stacks(StackStatusFilter=[
-            "CREATE_FAILED",
-            "CREATE_COMPLETE",
-            "ROLLBACK_FAILED",
-            "ROLLBACK_COMPLETE",
-            "DELETE_FAILED",
-            "UPDATE_COMPLETE",
-            "UPDATE_ROLLBACK_FAILED",
-            "UPDATE_ROLLBACK_COMPLETE"
-        ])
-        stacks_to_delete = [stack.get("StackName") 
-            for stack in stacks.get("StackSummaries") 
-            if stack.get("StackName") 
-            not in self.config.get("preserved_resources").get("cloudformation")]
-        if stacks_to_delete:
-            print("Stacks that will be deleted:", stacks_to_delete)
-            if self._ask("Delete stacks?", "no"):
-                for stack in stacks_to_delete: self.cf.delete_stack(StackName=stack)
-        else:
-            print("No stacks to delete")
+        args = {
+            "StackStatusFilter": [
+                "CREATE_FAILED",
+                "CREATE_COMPLETE",
+                "ROLLBACK_FAILED",
+                "ROLLBACK_COMPLETE",
+                "DELETE_FAILED",
+                "UPDATE_COMPLETE",
+                "UPDATE_ROLLBACK_FAILED",
+                "UPDATE_ROLLBACK_COMPLETE"
+            ]
+        }
+        self._simple_delete(self.cf.list_stacks, self.cf.delete_stack, "cloudformation", "StackSummaries", "StackName", args)
 
     def delete_key_pairs(self):
         self._simple_delete(self.ec2.describe_key_pairs, self.ec2.delete_key_pair, "ec2_key_pairs", "KeyPairs", "KeyName")
