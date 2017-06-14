@@ -128,13 +128,12 @@ class Cleaner:
         else:
             print("No alarms to delete")
 
-    def delete_bucket_and_its_objects(self, Name):
-        bucket = self.s3_resource.Bucket(Name)
-        bucket.object_versions.delete()
-        bucket.delete()
-
     def delete_buckets(self):
-        self._simple_delete(self.s3.list_buckets, self.delete_bucket_and_its_objects, "s3_buckets", "Buckets", "Name")
+        def delete_bucket_and_its_objects(Name):
+            bucket = self.s3_resource.Bucket(Name)
+            bucket.object_versions.delete()
+            bucket.delete()
+        self._simple_delete(self.s3.list_buckets, delete_bucket_and_its_objects, "s3_buckets", "Buckets", "Name")
 
     def delete_securitygroups(self):
         def not_default(resource):
