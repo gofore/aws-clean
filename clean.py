@@ -39,12 +39,11 @@ class Cleaner:
                 sys.stdout.write("Please answer 'yes' or 'no' (or 'y' or 'n').\n")
 
     def _get_deletable_resources(self, describe_function, describe_args, preserve_key, list_key, item_key):
-        resource_list = describe_function(**describe_args).get(list_key, [])
-        resources = {}
-        for resource in resource_list:
-            if resource[item_key] not in self.config.get("preserved_resources", {}).get(preserve_key, []):
-                resources[resource[item_key]] = resource
-        return resources
+        resources = describe_function(**describe_args).get(list_key, [])
+        preserved_resources = self.config.get("preserved_resources", {}).get(preserve_key, [])
+        def can_be_deleted(key, preserved_resources):
+            return key not in preserved_resources
+        return {resource[item_key]: resource for resource in resources if can_be_deleted(resource[item_key], preserved_resources)}
 
     def _delete_generic_resource(self, resources, human_name, delete_function, delete_key):
         if resources:
