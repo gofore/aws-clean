@@ -57,9 +57,9 @@ class Cleaner:
         else:
             print("No {} to delete".format(human_name))
 
-    def _simple_delete(self, describe_function, delete_function, preserve_key, human_name, list_key, item_key):
+    def _simple_delete(self, describe_function, delete_function, preserve_key, list_key, item_key):
         deletables = self._get_deletable_resources(describe_function, preserve_key, list_key, item_key)
-        self._delete_generic_resource(deletables, human_name, delete_function, item_key)
+        self._delete_generic_resource(deletables, list_key, delete_function, item_key)
 
     def show_config(self):
         print("Current configuration:\n", yaml.dump(self.config, default_flow_style=False))
@@ -106,7 +106,7 @@ class Cleaner:
             print("No stacks to delete")
 
     def delete_key_pairs(self):
-        self._simple_delete(self.ec2.describe_key_pairs, self.ec2.delete_key_pair, "ec2_key_pairs", "Keys", "KeyPairs", "KeyName")
+        self._simple_delete(self.ec2.describe_key_pairs, self.ec2.delete_key_pair, "ec2_key_pairs", "KeyPairs", "KeyName")
 
     def delete_amis(self):
         images = self.ec2.describe_images(
