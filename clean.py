@@ -2,12 +2,12 @@
 
 from __future__ import print_function
 import sys
-import boto3
 import yaml
 
 class Cleaner:
 
     def __init__(self, config):
+        import boto3
         self.config = config
         self.boto_session = boto3.Session(profile_name=self.config.get("profile_name"))
         self.cf = self.boto_session.client("cloudformation")
