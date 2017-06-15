@@ -8,15 +8,6 @@ class Cleaner:
 
     def __init__(self, config):
         self.config = config
-        import boto3
-        self.boto_session = boto3.Session(profile_name=self.config.get("profile_name"))
-        self.cf = self.boto_session.client("cloudformation")
-        self.cloudwatch = self.boto_session.client("cloudwatch")
-        self.ec2 = self.boto_session.client("ec2")
-        self.iam = self.boto_session.client("iam")
-        self.s3 = self.boto_session.client("s3")
-        self.s3_resource = self.boto_session.resource("s3")
-        self.sts = self.boto_session.client("sts")
 
     def _ask(self, question, default="no"):
         valid = {"yes": True, "y": True, "no": False, "n": False}
@@ -63,29 +54,25 @@ class Cleaner:
         deletables = self._get_deletable_resources(describe_function, describe_args, preserve_key, list_key, item_key, filter_function)
         self._delete_generic_resource(deletables, list_key, delete_function, item_key)
 
-    def show_config(self):
-        print("Current configuration:\n", yaml.dump(self.config, default_flow_style=False))
-
-    def run_safety_checks(self):
+    def run_safety_checks(self, sts, iam, iam_resource):
         # AWS Account ID in config.yml must match the account we are accessing using an API key
-        account_id = self.sts.get_caller_identity().get("Account")
+        account_id = sts.get_caller_identity().get("Account")
         assert account_id == self.config.get("assertions").get("account_id"), "Unexpected AWS Account ID, check configuration!"
 
         # AWS Account alias in config.yml must match the account alias
-        account_aliases = self.iam.list_account_aliases().get("AccountAliases")
+        account_aliases = iam.list_account_aliases().get("AccountAliases")
         assert len(account_aliases) == 1, "AWS Account should have exactly one alias"
         account_alias = account_aliases[0]
         assert account_alias == self.config.get("assertions").get("account_alias"), "Unexpected AWS Account alias, check configuration!"
 
         # IAM username in config.yml must match the IAM user whose API key we are using
-        iam_resource = self.boto_session.resource("iam")
         current_user = iam_resource.CurrentUser().user_name
         assert current_user == self.config.get("assertions").get("iam_username"), "Unexpected IAM User name, check configuration!"
 
         print("You are {} on account {} ({})".format(current_user, account_id, account_alias))
         if not self._ask("Proceed?", "no"): sys.exit()
 
-    def delete_cloudformation_stacks(self):
+    def delete_cloudformation_stacks(self, cf):
         args = {
             "StackStatusFilter": [
                 "CREATE_FAILED",
@@ -98,25 +85,25 @@ class Cleaner:
                 "UPDATE_ROLLBACK_COMPLETE"
             ]
         }
-        self._simple_delete(self.cf.list_stacks, self.cf.delete_stack, "cloudformation", "StackSummaries", "StackName", args)
+        self._simple_delete(cf.list_stacks, cf.delete_stack, "cloudformation", "StackSummaries", "StackName", args)
 
-    def delete_key_pairs(self):
-        self._simple_delete(self.ec2.describe_key_pairs, self.ec2.delete_key_pair, "ec2_key_pairs", "KeyPairs", "KeyName")
+    def delete_key_pairs(self, ec2):
+        self._simple_delete(ec2.describe_key_pairs, ec2.delete_key_pair, "ec2_key_pairs", "KeyPairs", "KeyName")
 
-    def delete_amis(self):
+    def delete_amis(self, sts, ec2):
         args = {
-            "Owners": [self.sts.get_caller_identity().get("Account")]
+            "Owners": [sts.get_caller_identity().get("Account")]
         }
-        self._simple_delete(self.ec2.describe_images, self.ec2.deregister_image, "ami", "Images", "ImageId", args)
+        self._simple_delete(ec2.describe_images, ec2.deregister_image, "ami", "Images", "ImageId", args)
 
-    def delete_snapshots(self):
+    def delete_snapshots(self, sts, ec2):
         args = {
-            "OwnerIds": [self.sts.get_caller_identity().get("Account")]
+            "OwnerIds": [sts.get_caller_identity().get("Account")]
         }
-        self._simple_delete(self.ec2.describe_snapshots, self.ec2.delete_snapshot, "snapshots", "Snapshots", "SnapshotId", args)
+        self._simple_delete(ec2.describe_snapshots, ec2.delete_snapshot, "snapshots", "Snapshots", "SnapshotId", args)
 
-    def delete_cloudwatch_alarms(self):
-        alarms = self.cloudwatch.describe_alarms()
+    def delete_cloudwatch_alarms(self, cloudwatch):
+        alarms = cloudwatch.describe_alarms()
         alarms_to_delete = [alarm.get("AlarmName") 
             for alarm in alarms.get("MetricAlarms")
             if alarm.get("AlarmName") 
@@ -124,23 +111,23 @@ class Cleaner:
         if alarms_to_delete:
             print("Alarms that will be deleted:", alarms_to_delete)
             if self._ask("Delete alarms?", "no"):
-                self.cloudwatch.delete_alarms(AlarmNames=alarms_to_delete)
+                cloudwatch.delete_alarms(AlarmNames=alarms_to_delete)
         else:
             print("No alarms to delete")
 
-    def delete_buckets(self):
+    def delete_buckets(self, s3, s3_resource):
         def delete_bucket_and_its_objects(Name):
-            bucket = self.s3_resource.Bucket(Name)
+            bucket = s3_resource.Bucket(Name)
             bucket.object_versions.delete()
             bucket.delete()
-        self._simple_delete(self.s3.list_buckets, delete_bucket_and_its_objects, "s3_buckets", "Buckets", "Name")
+        self._simple_delete(s3.list_buckets, delete_bucket_and_its_objects, "s3_buckets", "Buckets", "Name")
 
-    def delete_securitygroups(self):
+    def delete_securitygroups(self, ec2):
         def not_default(resource):
             return resource["GroupName"] != "default"
         self._simple_delete(
-            self.ec2.describe_security_groups, 
-            self.ec2.delete_security_group, 
+            ec2.describe_security_groups, 
+            ec2.delete_security_group, 
             "securitygroups", 
             "SecurityGroups", 
             "GroupId", 
@@ -154,15 +141,31 @@ def _get_config_from_file(filename):
         config = yaml.load(stream)
     return config
 
+def get_boto_session(profile_name):
+    import boto3
+    return boto3.Session(profile_name=profile_name)
 
 if __name__ == "__main__":
-    cleaner = Cleaner(_get_config_from_file(sys.argv[1]))
-    cleaner.show_config()
-    cleaner.run_safety_checks()
-    cleaner.delete_cloudformation_stacks()
-    cleaner.delete_cloudwatch_alarms()
-    cleaner.delete_amis()
-    cleaner.delete_snapshots()
-    cleaner.delete_securitygroups()
-    cleaner.delete_key_pairs()
-    cleaner.delete_buckets()
+    config = _get_config_from_file(sys.argv[1])
+    cleaner = Cleaner(config)
+    print("Current configuration:\n", yaml.dump(config, default_flow_style=False))
+
+    boto_session = get_boto_session(config["profile_name"])
+
+    cf = boto_session.client("cloudformation")
+    cloudwatch = boto_session.client("cloudwatch")
+    ec2 = boto_session.client("ec2")
+    iam = boto_session.client("iam")
+    iam_resource = boto_session.resource("iam")
+    s3 = boto_session.client("s3")
+    s3_resource = boto_session.resource("s3")
+    sts = boto_session.client("sts")
+
+    cleaner.run_safety_checks(sts, iam, iam_resource)
+    cleaner.delete_cloudformation_stacks(cf)
+    cleaner.delete_cloudwatch_alarms(cloudwatch)
+    cleaner.delete_amis(sts, ec2)
+    cleaner.delete_snapshots(sts, ec2)
+    cleaner.delete_securitygroups(ec2)
+    cleaner.delete_key_pairs(ec2)
+    cleaner.delete_buckets(s3, s3_resource)
