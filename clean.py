@@ -134,6 +134,9 @@ class Cleaner:
             filter_function=not_default
         )
 
+    def delete_sns_topics(self, sns):
+        self._simple_delete(sns.list_topics, sns.delete_topic, "sns_topics", "Topics", "TopicArn")
+
 
 def _get_config_from_file(filename):
     config = {}
@@ -160,10 +163,12 @@ if __name__ == "__main__":
     s3 = boto_session.client("s3")
     s3_resource = boto_session.resource("s3")
     sts = boto_session.client("sts")
+    sns = boto_session.client("sns")
 
     cleaner.run_safety_checks(sts, iam, iam_resource)
     cleaner.delete_cloudformation_stacks(cf)
     cleaner.delete_cloudwatch_alarms(cloudwatch)
+    cleaner.delete_sns_topics(sns)
     cleaner.delete_amis(sts, ec2)
     cleaner.delete_snapshots(sts, ec2)
     cleaner.delete_securitygroups(ec2)

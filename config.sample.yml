@@ -25,3 +25,5 @@ preserved_resources:
     - name-of-bucket-to-save
   securitygroups:
     - sg-01234567
+  sns_topics:
+    - arn-of-topic-to-save
