@@ -55,9 +55,10 @@ class Cleaner:
         self._delete_generic_resource(deletables, list_key, delete_function, item_key)
 
     def run_safety_checks(self, sts, iam, iam_resource):
-        # AWS Account ID in config.yml must match the account we are accessing using an API key
+        # AWS Account ID in config.yml must match the account we are accessing using an API key (if null then use only account_aliases)
         account_id = sts.get_caller_identity().get("Account")
-        assert account_id == self.config.get("assertions").get("account_id"), "Unexpected AWS Account ID, check configuration!"
+        if self.config.get("assertions").get("account_id"):
+            assert account_id == self.config.get("assertions").get("account_id"), "Unexpected AWS Account ID, check configuration!"
 
         # AWS Account alias in config.yml must match the account alias
         account_aliases = iam.list_account_aliases().get("AccountAliases")
@@ -174,3 +175,5 @@ if __name__ == "__main__":
     cleaner.delete_securitygroups(ec2)
     cleaner.delete_key_pairs(ec2)
     cleaner.delete_buckets(s3, s3_resource)
+
+
