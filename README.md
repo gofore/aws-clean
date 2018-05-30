@@ -8,6 +8,7 @@ This utility tool will delete all resources from your AWS account. Whitelisted r
 - EC2 key pairs
 - EC2 AMI images
 - EC2 security groups
+- EC2 instances
 - EBS snapshots
 - CloudWatch alarms
 - SNS topics

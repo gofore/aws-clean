@@ -55,10 +55,9 @@ class Cleaner:
         self._delete_generic_resource(deletables, list_key, delete_function, item_key)
 
     def run_safety_checks(self, sts, iam, iam_resource):
-        # AWS Account ID in config.yml must match the account we are accessing using an API key (if null then use only account_aliases)
+        # AWS Account ID in config.yml must match the account we are accessing using an API key
         account_id = sts.get_caller_identity().get("Account")
-        if self.config.get("assertions").get("account_id"):
-            assert account_id == self.config.get("assertions").get("account_id"), "Unexpected AWS Account ID, check configuration!"
+        assert account_id == self.config.get("assertions").get("account_id"), "Unexpected AWS Account ID, check configuration!"
 
         # AWS Account alias in config.yml must match the account alias
         account_aliases = iam.list_account_aliases().get("AccountAliases")
@@ -87,6 +86,31 @@ class Cleaner:
             ]
         }
         self._simple_delete(cf.list_stacks, cf.delete_stack, "cloudformation", "StackSummaries", "StackName", args)
+
+    def delete_ec2_instances(self, ec2):
+        instances = ec2.describe_instances(
+            Filters=[{
+                'Name': 'instance-state-name',
+                'Values': ['running', 'stopped', 'stopping'],
+            }]
+        )
+        instance_list = []
+        for reservation in instances["Reservations"]:
+            for instance in reservation["Instances"]:
+                instance_list.append(instance["InstanceId"])
+                print(instance["InstanceId"] + ":")
+                print("\tInstanceType: " + instance["InstanceType"])
+        if instance_list:
+            if self._ask("\nDelete EC2 Instances?", "no"):
+                response = ec2.terminate_instances(
+                    InstanceIds=
+                        instance_list
+                    ,
+                    DryRun=False
+                )
+                waiter = ec2.get_waiter('instance_terminated')
+                waiter.wait(InstanceIds=instance_list)
+                #print("Response was: ", response)
 
     def delete_key_pairs(self, ec2):
         self._simple_delete(ec2.describe_key_pairs, ec2.delete_key_pair, "ec2_key_pairs", "KeyPairs", "KeyName")
@@ -172,6 +196,7 @@ if __name__ == "__main__":
     cleaner.delete_sns_topics(sns)
     cleaner.delete_amis(sts, ec2)
     cleaner.delete_snapshots(sts, ec2)
+    cleaner.delete_ec2_instances(ec2)
     cleaner.delete_securitygroups(ec2)
     cleaner.delete_key_pairs(ec2)
     cleaner.delete_buckets(s3, s3_resource)
