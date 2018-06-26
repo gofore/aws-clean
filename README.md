@@ -14,6 +14,16 @@ This utility tool will delete all resources from your AWS account. Whitelisted r
 - SNS topics
 - S3 buckets
 
+### Region usage
+	# Assertions must pass before any resources are deleted
+	assertions:
+	  account_id: "012345678901"
+	  account_alias: your-account-iam-alias
+	  iam_username: your-iam-username
+	  regions:
+	    - us-east-1
+	    - us-east-2
+
 ### Usage
 
 Create a config from the sample file and edit it:
